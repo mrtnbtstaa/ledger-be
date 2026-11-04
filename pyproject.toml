@@ -19,6 +19,7 @@ dependencies = [
     "pymupdf>=1.24",
     "filetype>=1.2",
     "pycountry>=24.6",
+    "gspread>=6.2.1",
 ]
 
 [dependency-groups]

@@ -1,13 +1,17 @@
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from io import BytesIO
+from uuid import UUID
 
 from PIL import Image
 from sqlalchemy import insert
 
-from app.db.models import Receipt
-from app.db.session import engine
+from app.api import admin
+from app.config import Settings, get_settings
+from app.db.models import Receipt, SheetSync
+from app.db.session import SessionLocal, engine
 from app.schemas.extraction import Extracted
-from app.services import pipeline
+from app.services import pipeline, sheets
 from app.services.extraction import ExtractionResult
 
 
@@ -15,6 +19,108 @@ def png_bytes() -> bytes:
     output = BytesIO()
     Image.new("RGB", (20, 20), "white").save(output, format="PNG")
     return output.getvalue()
+
+
+class FakeWorksheet:
+    def __init__(self) -> None:
+        self.rows: list[list[object]] = []
+
+    def col_values(self, column: int) -> list[str]:
+        return [str(row[0]) for row in self.rows]
+
+    def append_row(self, row: list[object], value_input_option: str | None = None) -> None:
+        self.rows.append(row)
+
+
+class FailingWorksheet(FakeWorksheet):
+    def append_row(self, row: list[object], value_input_option: str | None = None) -> None:
+        raise RuntimeError("sheets down")
+
+
+async def test_auto_approved_sample_is_logged_once(client, monkeypatch) -> None:
+    worksheet = FakeWorksheet()
+    monkeypatch.setattr(sheets, "_worksheet", lambda settings: worksheet)
+
+    processed = await client.post("/samples/blue-bottle/process")
+    assert processed.status_code == 202
+    receipt = processed.json()
+    assert [row[0] for row in worksheet.rows] == [receipt["id"]]
+
+    async with SessionLocal() as session:
+        sync = await session.get(SheetSync, UUID(receipt["id"]))
+        assert sync is not None
+        assert sync.state == "synced"
+        sync.state = "pending"
+        await session.commit()
+        await sheets.sync_pending(session, get_settings())
+
+    assert [row[0] for row in worksheet.rows] == [receipt["id"]]
+
+
+async def test_approval_logs_once_and_rejection_logs_nothing(client, monkeypatch) -> None:
+    worksheet = FakeWorksheet()
+    monkeypatch.setattr(sheets, "_worksheet", lambda settings: worksheet)
+
+    pharmacy = (await client.post("/samples/corner-pharmacy/process")).json()
+    assert worksheet.rows == []
+    approved = await client.post(f"/receipts/{pharmacy['id']}/approve")
+    assert approved.status_code == 200
+    assert [row[0] for row in worksheet.rows] == [pharmacy["id"]]
+    assert worksheet.rows[0][8] == "approved"
+
+    harbor = (await client.post("/samples/harbor-hardware/process")).json()
+    rejected = await client.post(f"/receipts/{harbor['id']}/reject")
+    assert rejected.status_code == 200
+    assert [row[0] for row in worksheet.rows] == [pharmacy["id"]]
+
+
+async def test_sheet_failure_does_not_block_approval_and_retries(client, monkeypatch) -> None:
+    monkeypatch.setattr(sheets, "_worksheet", lambda settings: FailingWorksheet())
+
+    pharmacy = (await client.post("/samples/corner-pharmacy/process")).json()
+    approved = await client.post(f"/receipts/{pharmacy['id']}/approve")
+    assert approved.status_code == 200
+    assert approved.json()["status"] == "approved"
+
+    async with SessionLocal() as session:
+        sync = await session.get(SheetSync, UUID(pharmacy["id"]))
+        assert sync is not None
+        assert sync.state == "failed"
+        assert sync.attempts == 1
+        assert "sheets down" in (sync.last_error or "")
+        sync.updated_at = datetime.now(UTC) - timedelta(hours=1)
+        await session.commit()
+
+    worksheet = FakeWorksheet()
+    monkeypatch.setattr(sheets, "_worksheet", lambda settings: worksheet)
+    async with SessionLocal() as session:
+        assert await sheets.sync_pending(session, get_settings()) == 1
+
+    assert [row[0] for row in worksheet.rows] == [pharmacy["id"]]
+
+
+async def test_maintenance_retries_sheet_sync(client, monkeypatch) -> None:
+    monkeypatch.setattr(sheets, "_worksheet", lambda settings: FailingWorksheet())
+    pharmacy = (await client.post("/samples/corner-pharmacy/process")).json()
+    await client.post(f"/receipts/{pharmacy['id']}/approve")
+
+    async with SessionLocal() as session:
+        sync = await session.get(SheetSync, UUID(pharmacy["id"]))
+        assert sync is not None
+        sync.updated_at = datetime.now(UTC) - timedelta(hours=1)
+        await session.commit()
+
+    worksheet = FakeWorksheet()
+    monkeypatch.setattr(sheets, "_worksheet", lambda settings: worksheet)
+    monkeypatch.setattr(admin, "get_settings", lambda: Settings(admin_token="secret"))
+    response = await client.post(
+        "/admin/maintenance",
+        headers={"Authorization": "Bearer secret"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["sheetSynced"] == 1
+    assert [row[0] for row in worksheet.rows] == [pharmacy["id"]]
 
 
 async def test_health(client) -> None:

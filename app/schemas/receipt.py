@@ -126,6 +126,7 @@ class MaintenanceResult(BaseModel):
     purged_files: int = Field(alias="purgedFiles")
     purged_records: int = Field(alias="purgedRecords")
     failed_stuck: int = Field(alias="failedStuck")
+    sheet_synced: int = Field(alias="sheetSynced")
 
 
 def _money(value: Decimal | None) -> float | None:

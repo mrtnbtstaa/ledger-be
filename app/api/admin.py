@@ -5,7 +5,7 @@ from app.api.deps import get_session
 from app.config import get_settings
 from app.core.errors import ApiError
 from app.schemas.receipt import MaintenanceResult
-from app.services import retention
+from app.services import retention, sheets
 from app.services.pipeline import fail_stuck
 
 router = APIRouter()
@@ -24,8 +24,10 @@ async def maintenance(
 
     purged_files, purged_records = await retention.purge(session, settings)
     failed_stuck = await fail_stuck(session)
+    sheet_synced = await sheets.sync_pending(session, settings)
     return MaintenanceResult(
         purgedFiles=purged_files,
         purgedRecords=purged_records,
         failedStuck=failed_stuck,
+        sheetSynced=sheet_synced,
     )

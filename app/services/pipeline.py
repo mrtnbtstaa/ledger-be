@@ -111,7 +111,15 @@ async def process_receipt(receipt_id: UUID) -> None:
             )
             if status == "auto_approved":
                 add_audit(session, receipt.id, "approved", details={"automatic": True})
+                from app.services import sheets
+
+                await sheets.enqueue(session, receipt.id)
             await session.commit()
+            if status == "auto_approved":
+                try:
+                    await sheets.sync_pending(session, settings)
+                except Exception:
+                    logger.exception("sheet sync failed after auto approval")
         except LLMQuotaExhausted:
             await _fail(
                 session, receipt, "The demo's daily extraction budget is used up. Try a sample receipt."

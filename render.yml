@@ -4,8 +4,9 @@ services:
     runtime: python
     plan: free
     region: oregon
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    # Free plan has no pre-deploy command; migrate once per deploy, not on every boot.
+    buildCommand: pip install uv && uv sync --frozen --no-dev && .venv/bin/alembic upgrade head
+    startCommand: .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
       - key: DATABASE_URL

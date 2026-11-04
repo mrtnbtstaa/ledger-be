@@ -1,4 +1,5 @@
 import hashlib
+import logging
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Request
@@ -13,7 +14,10 @@ from app.db.models import Receipt, ReceiptFile
 from app.schemas.receipt import Receipt as ReceiptOut
 from app.schemas.receipt import Sample
 from app.services import samples as sample_service
+from app.services import sheets
 from app.services.pipeline import add_audit
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -69,6 +73,12 @@ async def process_sample(
     add_audit(session, receipt.id, "validated", details={"confidence": score})
     if status == "auto_approved":
         add_audit(session, receipt.id, "approved", details={"automatic": True})
+        await sheets.enqueue(session, receipt.id)
     await session.commit()
+    if status == "auto_approved":
+        try:
+            await sheets.sync_pending(session, settings)
+        except Exception:
+            logger.exception("sheet sync failed after sample approval")
 
     return serialize_receipt(receipt, file_row, request)

@@ -1,3 +1,4 @@
+import logging
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
@@ -24,7 +25,9 @@ from app.schemas.receipt import (
     to_domain,
     to_extracted_out,
 )
-from app.services import review
+from app.services import review, sheets
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -208,7 +211,12 @@ async def approve_receipt(
 ) -> ReceiptOut:
     receipt = await _load_receipt(session, id)
     review.approve(session, receipt)
+    await sheets.enqueue(session, receipt.id)
     await session.commit()
+    try:
+        await sheets.sync_pending(session, get_settings())
+    except Exception:
+        logger.exception("sheet sync failed after approval")
     return await _receipt_out(session, receipt, request)
 
 
