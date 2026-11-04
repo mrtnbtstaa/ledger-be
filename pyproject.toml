@@ -54,3 +54,4 @@ ignore = ["B008", "UP042"]
 python_version = "3.13"
 strict = true
 files = ["app/services"]
+python-downloads = "manual"

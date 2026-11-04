@@ -4,11 +4,13 @@ services:
     runtime: python
     plan: free
     region: singapore
-    buildCommand: pip install uv && uv sync --frozen --no-dev && .venv/bin/alembic upgrade head
+    buildCommand: pip install uv==0.13.7 && uv python install 3.12 && uv sync --frozen --no-dev && .venv/bin/alembic upgrade head
     startCommand: .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
       - key: DATABASE_URL
         sync: false
       - key: PYTHON_VERSION
-        value: "3.13.0"
+        value: "3.12.8"
+      - key: UV_VERSION
+        value: "0.13.7"
