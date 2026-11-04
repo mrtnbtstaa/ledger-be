@@ -2,6 +2,7 @@ import base64
 import json
 import logging
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 from uuid import UUID
 
@@ -23,16 +24,26 @@ async def enqueue(session: AsyncSession, receipt_id: UUID) -> None:
         session.add(SheetSync(receipt_id=receipt_id, state="pending"))
 
 
-def _worksheet(settings: Settings) -> Any | None:
+def _credentials(settings: Settings) -> Any | None:
     raw = settings.google_service_account_json.strip()
     if not raw or not settings.google_sheet_id:
         return None
+    # Accept a JSON string, base64, or a path to the service-account file.
+    path = Path(raw)
+    if path.is_file():
+        return json.loads(path.read_text(encoding="utf-8"))
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return json.loads(base64.b64decode(raw))
+
+
+def _worksheet(settings: Settings) -> Any | None:
+    info = _credentials(settings)
+    if info is None:
+        return None
     import gspread
 
-    try:
-        info = json.loads(raw)
-    except json.JSONDecodeError:
-        info = json.loads(base64.b64decode(raw))
     client = gspread.service_account_from_dict(info)
     return client.open_by_key(settings.google_sheet_id).worksheet(settings.google_sheet_tab)
 

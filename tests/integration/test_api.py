@@ -37,6 +37,13 @@ class FailingWorksheet(FakeWorksheet):
         raise RuntimeError("sheets down")
 
 
+def test_sheets_credentials_accept_file_path(tmp_path) -> None:
+    key = tmp_path / "credentials.json"
+    key.write_text('{"type": "service_account"}', encoding="utf-8")
+    settings = Settings(google_service_account_json=str(key), google_sheet_id="sheet")
+    assert sheets._credentials(settings) == {"type": "service_account"}
+
+
 async def test_auto_approved_sample_is_logged_once(client, monkeypatch) -> None:
     worksheet = FakeWorksheet()
     monkeypatch.setattr(sheets, "_worksheet", lambda settings: worksheet)
