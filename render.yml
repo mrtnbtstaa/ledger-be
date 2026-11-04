@@ -3,20 +3,12 @@ services:
     name: receipts-backend
     runtime: python
     plan: free
-    region: oregon
-    # Free plan has no pre-deploy command; migrate once per deploy, not on every boot.
+    region: singapore
     buildCommand: pip install uv && uv sync --frozen --no-dev && .venv/bin/alembic upgrade head
     startCommand: .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
       - key: DATABASE_URL
-        fromDatabase:
-          name: receipts
-          property: connectionString
+        sync: false
       - key: PYTHON_VERSION
         value: "3.13.0"
-
-databases:
-  - name: receipts
-    plan: free
-    region: oregon
