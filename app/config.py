@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     rate_limit_read: str = "60/minute"
     rate_limit_review: str = "20/minute"
 
-    allowed_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
+    allowed_origins: str = "http://localhost:3000,http://127.0.0.1:3000,https://ledger-be-b8y4.onrender.com"
     review_passcode: str = ""
     admin_token: str = ""
     public_base_url: str = ""
