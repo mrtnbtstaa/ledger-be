@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     rate_limit_read: str = "60/minute"
     rate_limit_review: str = "20/minute"
 
-    allowed_origins: str = "https://ledger-fe-xi.vercel.app,"
+    allowed_origins: str = "https://ledger-fe-xi.vercel.app"
     review_passcode: str = ""
     admin_token: str = ""
     public_base_url: str = ""
