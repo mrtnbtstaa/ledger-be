@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     rate_limit_read: str = "60/minute"
     rate_limit_review: str = "20/minute"
 
-    allowed_origins: str = "http://localhost:3000,http://127.0.0.1:3000,https://ledger-be-b8y4.onrender.com"
+    allowed_origins: str = "https://ledger-fe-xi.vercel.app,"
     review_passcode: str = ""
     admin_token: str = ""
     public_base_url: str = ""
@@ -41,7 +41,9 @@ class Settings(BaseSettings):
 
     @property
     def origins(self) -> list[str]:
-        return [origin.strip() for origin in self.allowed_origins.split(",") if origin.strip()]
+        if not self.allowed_origins:
+            return []
+        return [origin.strip().rstrip("/") for origin in self.allowed_origins.split(",") if origin.strip()]
 
 
 @lru_cache
