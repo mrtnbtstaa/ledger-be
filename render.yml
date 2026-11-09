@@ -14,3 +14,5 @@ services:
         value: "3.12.8"
       - key: UV_VERSION
         value: "0.13.7"
+      - key: UPLOADS_ENABLED
+        value: "false"
