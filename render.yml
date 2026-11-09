@@ -16,3 +16,5 @@ services:
         value: "0.13.7"
       - key: UPLOADS_ENABLED
         value: "false"
+      - key: JWT_SECRET
+        generateValue: true
