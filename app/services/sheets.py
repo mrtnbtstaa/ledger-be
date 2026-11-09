@@ -32,9 +32,14 @@ def _credentials(settings: Settings) -> Any | None:
     if not raw or not settings.google_sheet_id:
         return None
     # Accept a JSON string, base64, or a path to the service-account file.
-    path = Path(raw)
-    if path.is_file():
-        return json.loads(path.read_text(encoding="utf-8"))
+    if raw.startswith("{"):
+        return json.loads(raw)
+    try:
+        path = Path(raw)
+        if path.is_file():
+            return json.loads(path.read_text(encoding="utf-8"))
+    except OSError:
+        pass
     try:
         return json.loads(raw)
     except json.JSONDecodeError:

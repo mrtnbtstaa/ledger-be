@@ -44,6 +44,13 @@ def test_sheets_credentials_accept_file_path(tmp_path) -> None:
     assert sheets._credentials(settings) == {"type": "service_account"}
 
 
+def test_sheets_credentials_accept_json_value() -> None:
+    settings = Settings(
+        google_service_account_json='{"type": "service_account"}', google_sheet_id="sheet"
+    )
+    assert sheets._credentials(settings) == {"type": "service_account"}
+
+
 async def test_auto_approved_sample_is_logged_once(client, monkeypatch) -> None:
     worksheet = FakeWorksheet()
     monkeypatch.setattr(sheets, "_worksheet", lambda settings: worksheet)
