@@ -4,7 +4,6 @@ import logging
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
-from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,9 +18,13 @@ _SYNC_STATES = ("pending", "failed")
 _MAX_BACKOFF_SECONDS = 3600
 
 
-async def enqueue(session: AsyncSession, receipt_id: UUID) -> None:
-    if await session.get(SheetSync, receipt_id) is None:
-        session.add(SheetSync(receipt_id=receipt_id, state="pending"))
+async def enqueue(session: AsyncSession, sample_id: str) -> None:
+    row = await session.get(SheetSync, sample_id)
+    if row is None:
+        session.add(SheetSync(sample_id=sample_id, state="pending", updated_at=datetime.now(UTC)))
+    elif row.state != "synced":
+        row.state = "pending"
+        row.updated_at = datetime.now(UTC)
 
 
 def _credentials(settings: Settings) -> Any | None:
@@ -63,7 +66,7 @@ def _value(data: dict[str, Any], key: str) -> Any:
 def _row(receipt: Receipt) -> list[Any]:
     data = receipt.data or {}
     return [
-        str(receipt.id),
+        receipt.sample_id or str(receipt.id),
         _value(data, "date"),
         _value(data, "vendor"),
         _value(data, "category"),
@@ -104,11 +107,16 @@ async def sync_pending(session: AsyncSession, settings: Settings, limit: int = 2
     for row in rows:
         if not _retry_due(row, now):
             continue
-        receipt = await session.get(Receipt, row.receipt_id)
+        receipt = await session.scalar(
+            select(Receipt)
+            .where(Receipt.sample_id == row.sample_id, Receipt.is_sample.is_(True))
+            .order_by(Receipt.uploaded_at.desc())
+            .limit(1)
+        )
         if receipt is None or receipt.status not in ("approved", "auto_approved"):
             row.state = "failed"
             row.attempts += 1
-            row.last_error = "Receipt is missing or not approved."
+            row.last_error = "Sample is missing or not approved."
             row.updated_at = now
             await session.commit()
             continue
@@ -116,7 +124,7 @@ async def sync_pending(session: AsyncSession, settings: Settings, limit: int = 2
         try:
             # shortcut: scans column A for idempotency; fine at demo row counts.
             ids = worksheet.col_values(1)
-            if str(receipt.id) not in ids:
+            if row.sample_id not in ids:
                 # RAW keeps untrusted receipt text from being evaluated as a formula.
                 worksheet.append_row(_row(receipt), value_input_option="RAW")
             row.state = "synced"
@@ -133,5 +141,5 @@ async def sync_pending(session: AsyncSession, settings: Settings, limit: int = 2
             row.updated_at = now
             add_audit(session, receipt.id, "sheet_sync_failed", details={"error": row.last_error})
             await session.commit()
-            logger.warning("sheet sync failed for %s: %s", receipt.id, exc)
+            logger.warning("sheet sync failed for %s: %s", row.sample_id, exc)
     return synced

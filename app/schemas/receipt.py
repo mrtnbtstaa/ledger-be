@@ -66,6 +66,7 @@ class Receipt(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     id: str
+    is_sample: bool = Field(alias="isSample")
     filename: str
     file_type: str = Field(alias="fileType")
     uploaded_at: datetime = Field(alias="uploadedAt")
@@ -125,6 +126,7 @@ class MaintenanceResult(BaseModel):
 
     purged_files: int = Field(alias="purgedFiles")
     purged_records: int = Field(alias="purgedRecords")
+    purged_tokens: int = Field(alias="purgedTokens")
     failed_stuck: int = Field(alias="failedStuck")
     sheet_synced: int = Field(alias="sheetSynced")
 

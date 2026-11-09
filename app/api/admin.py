@@ -22,12 +22,13 @@ async def maintenance(
     if authorization != f"Bearer {settings.admin_token}":
         raise ApiError(401, "unauthorized", "Admin token required.")
 
-    purged_files, purged_records = await retention.purge(session, settings)
+    purged_files, purged_records, purged_tokens = await retention.purge(session, settings)
     failed_stuck = await fail_stuck(session)
     sheet_synced = await sheets.sync_pending(session, settings)
     return MaintenanceResult(
         purgedFiles=purged_files,
         purgedRecords=purged_records,
+        purgedTokens=purged_tokens,
         failedStuck=failed_stuck,
         sheetSynced=sheet_synced,
     )

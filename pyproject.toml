@@ -22,6 +22,10 @@ dependencies = [
     "gspread>=6.2.1",
     "psycopg>=3.3.8",
     "psycopg-binary>=3.3.8",
+    "PyJWT>=2.9",
+    "argon2-cffi>=23.1",
+    "openpyxl>=3.1",
+    "email-validator>=2.2",
 ]
 
 [dependency-groups]
@@ -56,4 +60,3 @@ ignore = ["B008", "UP042"]
 python_version = "3.12"
 strict = true
 files = ["app/services"]
-python-downloads = "manual"

@@ -1,11 +1,12 @@
 import logging
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi.errors import RateLimitExceeded
 
-from app.api import admin, health, receipts, samples, upload
+from app.api import admin, auth, export, health, me, receipts, samples, upload, validate
 from app.config import get_settings
 from app.core.errors import (
     ApiError,
@@ -63,6 +64,10 @@ app.add_exception_handler(Exception, unhandled_error_handler)
 
 app.include_router(health.router)
 app.include_router(admin.router)
+app.include_router(auth.router)
+app.include_router(me.router)
+app.include_router(validate.router)
+app.include_router(export.router)
 app.include_router(upload.router)
 app.include_router(samples.router)
 app.include_router(receipts.router)

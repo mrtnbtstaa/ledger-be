@@ -42,7 +42,11 @@ async def api_error_handler(request: Request, exc: ApiError) -> JSONResponse:
 
 
 async def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
-    logger.info("request validation failed: %s", exc.errors())
+    # Never log validation inputs: auth request bodies can contain passwords.
+    logger.info(
+        "request validation failed: %s",
+        [(error.get("loc"), error.get("type")) for error in exc.errors()],
+    )
     return JSONResponse(
         status_code=422,
         content=error_body(request, "validation_error", "Some fields were invalid."),
